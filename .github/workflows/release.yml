@@ -1,0 +1,61 @@
+name: Builder
+
+# Library-wheel releaser: yz-satellite-common has NO manifest and NO UI — the
+# only release asset is the pip wheel. Same trigger contract as every yz-*
+# satellite: a push whose commit message starts with "Release " (subtree
+# pushes carry the monorepo commit message), or manual dispatch. Version
+# flows from pyproject.toml.
+#
+# Lives in the package's OWN .github/ so it travels with the git-subtree
+# split into the standalone repo. INERT in the JarvYZ monorepo (Actions reads
+# only the repo-ROOT .github/); it activates once this folder is the split
+# repo's root.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build + Release (wheel)
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'Release ')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+      - name: Read version from pyproject.toml
+        id: ver
+        run: echo "VERSION=$(grep -m1 -E '^version = ' pyproject.toml | sed -E 's/.*"(.*)".*/\1/')" >> "$GITHUB_OUTPUT"
+      - name: Version gate - a repo's first release must be 0.0.1
+        run: |
+          if [ "$(git ls-remote --tags origin | wc -l)" -eq 0 ] && [ "${{ steps.ver.outputs.VERSION }}" != "0.0.1" ]; then
+            echo "::error::No tags exist on this repo yet - the FIRST release must be version 0.0.1 (got ${{ steps.ver.outputs.VERSION }}). Fix the version field and re-release."
+            exit 1
+          fi
+      - name: Build wheel
+        run: uv build --wheel --out-dir staged
+      - name: Generate changelog
+        run: |
+          V="${{ steps.ver.outputs.VERSION }}"
+          NAME="$(grep -m1 -E '^name = ' pyproject.toml | sed -E 's/.*"(.*)".*/\1/')"
+          echo "## ${NAME} v${V}" > changelog.md
+          echo "" >> changelog.md
+          PREV=$(git describe --tags --abbrev=0 "HEAD^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then
+            git log --pretty=format:"- %s (%h)" "${PREV}..HEAD" >> changelog.md
+          else
+            git log --pretty=format:"- %s (%h)" -n 20 >> changelog.md
+          fi
+      - name: Create / update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.VERSION }}
+          name: v${{ steps.ver.outputs.VERSION }}
+          body_path: changelog.md
+          files: staged/*
