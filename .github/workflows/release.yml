@@ -39,6 +39,8 @@ jobs:
             exit 1
           fi
       - name: Build wheel
+        # uv build drops a .gitignore into the out dir — upload *.whl only,
+        # or it shows up as a bogus 1-byte release asset.
         run: uv build --wheel --out-dir staged
       - name: Generate changelog
         run: |
@@ -58,4 +60,4 @@ jobs:
           tag_name: v${{ steps.ver.outputs.VERSION }}
           name: v${{ steps.ver.outputs.VERSION }}
           body_path: changelog.md
-          files: staged/*
+          files: staged/*.whl
