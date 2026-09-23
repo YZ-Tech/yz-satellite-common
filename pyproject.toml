@@ -1,7 +1,7 @@
 [project]
 name = "yz-satellite-common"
-version = "0.0.1"
-description = "Shared plumbing for yz-* satellites: event broadcaster + /events WS router, persistent-settings engine, YZ_PORT-standard server entry."
+version = "0.0.2"
+description = "Shared code for yz-* satellites and core: event broadcaster + /events WS router, persistent-settings engine, YZ_PORT-standard server entry, and the sheet record (fact merge math)."
 readme = "README.md"
 requires-python = ">=3.10"
 # Deliberately dependency-free: fastapi/uvicorn are imported lazily inside
