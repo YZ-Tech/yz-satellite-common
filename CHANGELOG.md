@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.3
+
+- `sheet`: locked facts. An attribute carrying `locked: true` is authored
+  canon — a character's background story, or anything a human pinned. It wins
+  every contradiction (a new `locked` action, never `disputed`: there is
+  nothing to resolve, the author already decided) and it never decays.
+- `sheet.put_locked()` — write an authored fact. Returns `added`, `unchanged`
+  or **`refused`**, where a refusal means the fact was already disclosed and
+  the new value differs. A pack update may add facts; it may never change one
+  the character has already told someone.
+- Only `yz-people` pins this wheel today and it uses neither, so its
+  `>=0.0.2` pin still holds.
+
 ## 0.0.2
 
 - `yz_satellite_common.sheet` — the sheet record: merge math for the

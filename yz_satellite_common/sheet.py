@@ -129,6 +129,16 @@ def observe(
             changes.append({"key": key, "action": "added", "value": value})
             continue
 
+        if existing.get("locked") and not _same(existing.get("value"), value):
+            # A locked fact is authored, not observed — the character's own
+            # background story, or something a human pinned. Nothing the
+            # extractor finds may contradict it, and it never becomes
+            # "disputed": there is nothing to resolve, the author already
+            # decided. This is what keeps an improvised detail from quietly
+            # rewriting canon.
+            changes.append({"key": key, "action": "locked", "value": value})
+            continue
+
         if _same(existing.get("value"), value):
             existing["observations"] = int(existing.get("observations", 1)) + 1
             existing["confidence"] = _confidence(existing["observations"])
@@ -198,6 +208,10 @@ def decay(sheet: dict[str, Any], *, now: float | None = None) -> dict[str, Any]:
     now = time.time() if now is None else now
     sheet = normalize(sheet)
     for attr in sheet["attributes"].values():
+        if attr.get("locked"):
+            # Authored facts do not fade. A character's background story is as
+            # true in year two as on day one.
+            continue
         half_life = _HALF_LIFE_DAYS.get(attr.get("volatility", "slow"))
         if not half_life:
             continue
@@ -299,6 +313,53 @@ def resolve_dispute(
     attr["confidence"] = _CONF_CEIL
     attr["last_seen"] = now
     return sheet
+
+
+def put_locked(
+    sheet: dict[str, Any],
+    key: str,
+    value: Any,
+    *,
+    tier: int = 0,
+    dimension: str = "core",
+    visibility: str | None = None,
+    now: float | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Write an authored fact — the character's background story, or anything
+    a human pinned as canon.
+
+    Returns the sheet and what happened: `added`, `unchanged`, or `refused`.
+    **`refused` means the fact was already disclosed and its value differs.**
+    A pack update may add facts; it may never change one the character has
+    already told someone, because the listener heard the old version and there
+    is no taking it back. Callers surface a refusal rather than swallowing it.
+    """
+    now = time.time() if now is None else now
+    sheet = normalize(sheet)
+    existing = sheet["attributes"].get(key)
+    if existing is not None and not _same(existing.get("value"), value):
+        if existing.get("disclosed_at"):
+            return sheet, "refused"
+    if existing is not None and _same(existing.get("value"), value):
+        return sheet, "unchanged"
+
+    sheet["attributes"][key] = {
+        "value": value,
+        "confidence": _CONF_CEIL,
+        "observations": 1,
+        "first_seen": (existing or {}).get("first_seen", now),
+        "last_seen": now,
+        "source_chunks": [],
+        "origin": "authored",
+        "locked": True,
+        "tier": tier,
+        "dimension": dimension,
+        "visibility": visibility or ("private" if tier >= 2 else "household"),
+        "volatility": "stable",
+    }
+    if existing is not None and existing.get("disclosed_at"):
+        sheet["attributes"][key]["disclosed_at"] = existing["disclosed_at"]
+    return sheet, "added"
 
 
 def set_coverage(sheet: dict[str, Any], coverage: dict[str, Any]) -> dict[str, Any]:

@@ -1,6 +1,6 @@
 [project]
 name = "yz-satellite-common"
-version = "0.0.2"
+version = "0.0.3"
 description = "Shared code for yz-* satellites and core: event broadcaster + /events WS router, persistent-settings engine, YZ_PORT-standard server entry, and the sheet record (fact merge math)."
 readme = "README.md"
 requires-python = ">=3.10"
